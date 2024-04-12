@@ -1,65 +1,32 @@
-import tensorflow as tf
-from pathlib import Path
-from cnnClassifier.entity.config_entity import PrepareBaseModelConfig
+from cnnClassifier.config.configuration import ConfigurationManager
+from cnnClassifier.components.prepare_base_model import PrepareBaseModel
+from cnnClassifier import logger
 
 
-class PrepareBaseModel:
-    def __init__(self, config: PrepareBaseModelConfig):
-        self.config = config
-        
-    
-    def get_base_model(self):
-        self.model = tf.keras.applications.MobileNetV2(
-            input_shape=self.config.params_image_size,
-            include_top=self.config.params_include_top,
-            weights=self.config.params_weights
-        )
-        
-        self.save_model(path=self.config.base_model_path, model=self.model)
-        
-    
-    @staticmethod
-    def _prepare_full_model(model, classes, freeze_all, freeze_till, learning_rate):
-        if freeze_all:
-            for layer in model.layers:
-                model.trainable = False
-        elif (freeze_till is not None) and (freeze_till > 0):
-            for layer in model.layers[:-freeze_till]:
-                model.trainable = False
 
-        flatten_in = tf.keras.layers.Flatten()(model.output)
-        prediction = tf.keras.layers.Dense(
-            units=classes,
-            activation="softmax"
-        )(flatten_in)
+STAGE_NAME = "Prepare base model"
 
-        full_model = tf.keras.models.Model(
-            inputs=model.input,
-            outputs=prediction
-        )
 
-        full_model.compile(
-            optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
-            loss=tf.keras.losses.CategoricalCrossentropy(),
-            metrics=["accuracy"]
-        )
+class PrepareBaseModelTrainingPipeline:
+    def __init__(self):
+        pass
 
-        full_model.summary()
-        return full_model
-    
+    def main(self):
+        config = ConfigurationManager()
+        prepare_base_model_config = config.get_prepare_base_model_config()
+        prepare_base_model = PrepareBaseModel(config=prepare_base_model_config)
+        prepare_base_model.get_base_model()
+        prepare_base_model.update_base_model()
 
-    def update_base_model(self):
-        self.full_model = self._prepare_full_model(
-            model=self.model,
-            classes=self.config.params_classes,
-            freeze_all=True,
-            freeze_till=None,
-            learning_rate=self.config.params_learning_rate
-        )
 
-        self.save_model(path=self.config.updated_base_model_path, model=self.full_model)
-    
 
-    @staticmethod
-    def save_model(path: Path, model: tf.keras.Model):
-        model.save(path)
+if __name__ == '__main__':
+    try:
+        logger.info(f"*******************")
+        logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+        obj = PrepareBaseModelTrainingPipeline()
+        obj.main()
+        logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+    except Exception as e:
+        logger.exception(e)
+        raise e
